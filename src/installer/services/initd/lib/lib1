@@ -1,0 +1,125 @@
+#!/bin/bash
+format() {
+    local fs="$1"
+    local device="$2"
+    if [[ "$fs" == "ext4" ]]; then
+        mkfs.ext4 "$device"
+    elif [[ "$fs" == "xfs" ]]; then
+        mkfs.xfs "$device"
+    elif [[ "$fs" == "btrfs" ]]; then
+        mkfs.btrfs "$device"
+    elif [[ "$fs" == "f2fs" ]]; then
+        mkfs.f2fs "$device" || make_f2fs "$device"
+    elif [[ "$fs" == "ntfs" ]]; then
+        echo "NTFS is not intended to be the root filesystem. Please use ext4, xfs, btrfs, or f2fs instead."
+    else
+        echo "Unsupported filesystem: $fs"
+        return 1
+    fi
+}
+scan_device_to_install_linux() {
+    local -a devices=()
+    local -a descriptions=()
+    local line name size model type read_only choice index device
+    local name_pattern='NAME="([^"]+)"'
+    local size_pattern='SIZE="([^"]*)"'
+    local model_pattern='MODEL="([^"]*)"'
+    local type_pattern='TYPE="([^"]+)"'
+    local read_only_pattern='RO="([^"]+)"'
+
+    if ! command -v lsblk >/dev/null 2>&1; then
+        echo "Cannot scan storage devices: lsblk is not available." >&2
+        return 1
+    fi
+
+    while IFS= read -r line; do
+        [[ "$line" =~ $name_pattern ]] && name="${BASH_REMATCH[1]}"
+        [[ "$line" =~ $size_pattern ]] && size="${BASH_REMATCH[1]}"
+        [[ "$line" =~ $model_pattern ]] && model="${BASH_REMATCH[1]}"
+        [[ "$line" =~ $type_pattern ]] && type="${BASH_REMATCH[1]}"
+        [[ "$line" =~ $read_only_pattern ]] && read_only="${BASH_REMATCH[1]}"
+        [[ "$type" == "disk" ]] || continue
+        [[ "$read_only" == "0" ]] || continue
+        [[ "$name" != zram* && "$name" != mmcblk*boot* ]] || continue
+        device="/dev/$name"
+        [[ -b "$device" ]] || continue
+        devices+=("$device")
+        model="${model:-unknown model}"
+        descriptions+=("$size - $model")
+    done <<< "$(lsblk -dnP -o NAME,SIZE,MODEL,TYPE,RO 2>/dev/null)"
+
+    if (( ${#devices[@]} == 0 )); then
+        echo "No installation disks were detected." >&2
+        return 1
+    fi
+
+    echo "Select the disk where Linux will be installed:" >&2
+    for index in "${!devices[@]}"; do
+        printf '  %d) %s (%s)\n' "$((index + 1))" "${devices[$index]}" "${descriptions[$index]}" >&2
+    done
+
+    while true; do
+        read -r -p "Disk number (q to cancel): " choice
+        if [[ "$choice" == "q" || "$choice" == "Q" ]]; then
+            return 1
+        fi
+        if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#devices[@]} )); then
+            device="${devices[$((choice - 1))]}"
+            [[ -b "$device" ]] || {
+                echo "The selected disk is no longer available." >&2
+                return 1
+            }
+            REPLY="$device"
+            printf '%s\n' "$device"
+            return 0
+        fi
+        echo "Invalid selection. Choose one of the listed disk numbers." >&2
+    done
+}
+
+install_device_to_linux() {
+    local device filesystem choice confirmation
+
+    device="$(scan_device_to_install_linux)" || return 1
+
+    echo "Select the filesystem for $device:" >&2
+    echo "  1) ext4" >&2
+    echo "  2) xfs" >&2
+    echo "  3) btrfs" >&2
+    echo "  4) f2fs" >&2
+
+    while true; do
+        read -r -p "Filesystem number (q to cancel): " choice
+        case "$choice" in
+            1) filesystem="ext4"; break ;;
+            2) filesystem="xfs"; break ;;
+            3) filesystem="btrfs"; break ;;
+            4) filesystem="f2fs"; break ;;
+            q|Q) return 1 ;;
+            *) echo "Invalid filesystem selection." >&2 ;;
+        esac
+    done
+
+    echo "WARNING: all data on $device will be destroyed." >&2
+    read -r -p "Type FORMAT to continue: " confirmation
+    [[ "$confirmation" == "FORMAT" ]] || {
+        echo "Formatting cancelled." >&2
+        return 1
+    }
+
+    [[ -b "$device" ]] || {
+        echo "The selected disk is no longer available." >&2
+        return 1
+    }
+
+    format "$filesystem" "$device"
+}
+clean_image() {
+    echo "THIS WILL DESTROY ALL DATA ON $1. Are you sure you want to continue? (y/N) "
+    read -r confirmation
+    [[ "$confirmation" == "y" || "$confirmation" == "Y" ]] || {
+        echo "Operation cancelled."
+        return 1
+    }
+    dd if=/dev/zero of="$1" bs=1M status=progress || true
+}

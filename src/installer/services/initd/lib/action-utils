@@ -1,0 +1,59 @@
+service='/services'
+init='/services/initd/initd'
+lib='/services/initd/lib'
+uac() {
+   if [[ "$1" == "-c" ]]; then
+      mkdir -p /uac/tmp
+      echo "$2" > /uac/tmp/uac.tmp
+      /services/action /uac/tmp/uac.tmp
+      rm -rf /uac/tmp/uac.tmp
+   fi
+}
+get() {
+    awk -F' *= *' -v key="$1" '$1 == key { print $2; exit }' /services/system.prop || return 1
+}
+set() {
+    mkdir -p /uac/tmp
+    echo "set $1 == \"$2\"" > /uac/tmp/set.tmp
+    /services/action /uac/tmp/set.tmp
+}
+report() {
+    mkdir -p /report
+    echo "report $1 == \"/report/setup.log\"" > /uac/tmp/report.tmp
+    /services/action /uac/tmp/report.tmp
+}
+sigkill() {
+    kill -9 "$1"
+}
+smnt() {
+   /bin/mount -t "$1" "$1" "$2" > /dev/null
+   if [[ -f "$2" ]]; then
+        echo "$2 is a file. Mount failed"
+   fi
+}
+mdev() {
+    mkdir -p /dev
+    smnt devtmpfs /dev
+}
+msys() {
+    mkdir -p /sys
+    smnt sysfs /sys
+}
+mproc() {
+    mkdir -p /proc
+    smnt proc /proc
+}
+mtmp() {
+    mkdir -p /tmp
+    smnt tmpfs /tmp
+}
+versioniso() {
+    get build.version
+}    
+klog() {
+    echo "[$$]: $1" > /dev/kmsg
+}
+smkd() {
+    mkdir -p "$1"
+}
+

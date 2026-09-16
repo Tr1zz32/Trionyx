@@ -1,0 +1,6 @@
+smnt() {
+   /bin/mount -t "$1" "$1" "$2" > /dev/null
+   if [[ -f "$2" ]]; then
+	echo "$2 is a file. Mount failed"
+   fi
+}
