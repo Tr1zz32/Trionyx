@@ -1,0 +1,12 @@
+## READ ##
+on system/usr you will typically find the following directories
+	bin/
+	include/
+	lib/
+	lib64/ → libassan64/
+	libassan64/
+	libexec/
+	sbin/
+	share/
+## note: This only counts within the scope of the GNU C library package
+##  You could see the diagram with more elements in the final system

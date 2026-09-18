@@ -1,0 +1,4 @@
+/* GNU ld script
+*/
+OUTPUT_FORMAT(elf64-x86-64)
+GROUP ( /system/usr/lib/libm-2.41.a /system/usr/lib/libmvec.a )

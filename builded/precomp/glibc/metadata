@@ -1,0 +1,7 @@
+<GNU C Library>
+Version = 2.41
+Type = Stable
+Objetive = x86_64-linux-gnu
+##  GNU LGPL
+Compiled for codename Trionyx GNU/Linux
+<<end
