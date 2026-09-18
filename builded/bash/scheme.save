@@ -1,0 +1,8 @@
+## READ ##
+on system/usr you will typically find the following directories
+        bin/
+        include/
+        lib/
+        share/
+## note: This only counts within the scope of the GNU Bourne Again SHell package
+##  You could see the diagram with more elements in the final system

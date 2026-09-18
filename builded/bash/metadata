@@ -1,0 +1,6 @@
+<GNU Bourne Again SHell>
+Version = 5.3
+Type = release
+Objective = x86_64-linux-gnu
+Compiled for codename Trionyx GNU/Linux
+<<end
