@@ -18,12 +18,12 @@ int main() {
     trionyx::ipc::sockstream socket;
     if (!socket.hear(std::string("/run/trionyx/service.sock"))) return 1;
     if (!socket.write(std::string("hola"))) return 1;
-    std::string response;
-    if (!socket.read(response)) return 1;
+    auto response = socket.read();
+    if (!response) return 1; // revisar errno
 }
 ```
 
-`sockstream` es un alias de `UnixStream` en `trionyx::ipc`; no altera el espacio de nombres `trionyx::sysdata`. Referencia completa en [`Documentation/UNIX_SOCKETS_SPANISH.md`](Documentation/UNIX_SOCKETS_SPANISH.md).
+`read()` devuelve `std::optional<std::string>`: `*response` es el mensaje; vacío también puede ser un frame válido y `std::nullopt` significa error. `sockstream` es un alias de `UnixStream` en `trionyx::ipc`; no altera el espacio de nombres `trionyx::sysdata`. Referencia completa en [`Documentation/UNIX_SOCKETS_SPANISH.md`](Documentation/UNIX_SOCKETS_SPANISH.md).
 
 El protocolo de trama tiene un tamaño de 32 bits en orden de red, seguido por los bytes del payload. La referencia completa está en [`Documentation/UNIX_SOCKETS_SPANISH.md`](Documentation/UNIX_SOCKETS_SPANISH.md).
 

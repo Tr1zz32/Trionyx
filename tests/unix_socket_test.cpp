@@ -134,8 +134,8 @@ static void test_compact_sockstream_api_with_std_string() {
             return;
         }
         CHECK(has_close_on_exec(peer.native_handle()));
-        std::string request;
-        if (!peer.read(request) || request != "ping") {
+        const auto request = peer.read();
+        if (!request || *request != "ping") {
             return;
         }
         server_ok = peer.write(std::string("pong"));
@@ -145,14 +145,32 @@ static void test_compact_sockstream_api_with_std_string() {
     CHECK(socket.hear(std::string(path)));
     CHECK(has_close_on_exec(socket.native_handle()));
     CHECK(socket.write(std::string("ping")));
-    std::string response;
-    CHECK(socket.read(response));
-    CHECK(response == "pong");
+    const auto response = socket.read();
+    CHECK(response.has_value());
+    CHECK(*response == "pong");
 
     worker.join();
     CHECK(server_ok);
     server.close();
     CHECK(::unlink(path) == 0);
+}
+
+static void test_value_read_distinguishes_empty_frame_from_error() {
+    int descriptors[2] = {-1, -1};
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, descriptors) == 0);
+    trionyx::ipc::sockstream sender{descriptors[0]};
+    trionyx::ipc::sockstream receiver{descriptors[1]};
+
+    CHECK(sender.write(std::string_view{}));
+    const auto empty_frame = receiver.read();
+    CHECK(empty_frame.has_value());
+    CHECK(empty_frame->empty());
+
+    trionyx::ipc::sockstream disconnected;
+    errno = 0;
+    const auto error = disconnected.read();
+    CHECK(!error.has_value());
+    CHECK(errno == EBADF);
 }
 
 static void test_sockstream_binary_string_payload() {
@@ -202,6 +220,7 @@ int main() {
     test_oversized_frame_rejected();
     test_server_client_round_trip();
     test_compact_sockstream_api_with_std_string();
+    test_value_read_distinguishes_empty_frame_from_error();
     test_sockstream_binary_string_payload();
     test_string_payload_preserves_nul();
     test_string_frame_limit();

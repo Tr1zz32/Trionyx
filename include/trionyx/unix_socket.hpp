@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
@@ -206,6 +207,10 @@ class UnixStream {
     bool hear(const std::string &path) noexcept { return connect(path); }
 
     // Framed, binary-safe member I/O. Existing free functions are unchanged.
+    // Returns nullopt on I/O/size errors; an empty optional value is a valid
+    // zero-length frame. The output-parameter overload remains for compatibility.
+    std::optional<std::string> read(
+        std::uint32_t max_size = default_max_frame_size);
     bool read(std::string &payload,
               std::uint32_t max_size = default_max_frame_size);
     bool read(void *buffer, std::uint32_t capacity,
@@ -479,6 +484,14 @@ inline bool receive_frame(UnixStream &stream, std::string &payload,
 // Convenience alias, not a second implementation: old UnixStream users and
 // sysdata keep the same class and descriptor semantics.
 using sockstream = UnixStream;
+
+inline std::optional<std::string> UnixStream::read(std::uint32_t max_size) {
+    std::string payload;
+    if (!receive_frame(*this, payload, max_size)) {
+        return std::nullopt;
+    }
+    return payload;
+}
 
 inline bool UnixStream::read(std::string &payload, std::uint32_t max_size) {
     return receive_frame(*this, payload, max_size);
